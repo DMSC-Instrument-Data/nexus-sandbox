@@ -16,13 +16,13 @@ std::vector<T> read(const H5::H5File &file, const std::string &dataSetName) {
   return result;
 }
 
-int main() {
+int main(int argc, char **argv) {
   boost::mpi::environment env;
   boost::mpi::communicator comm;
 
-  H5::H5File file(
-      "/home/simon/mantid/nexus/load-performance/sample-files/gzip-level6.nxs",
-      H5F_ACC_RDONLY);
+  // /home/simon/mantid/nexus/load-performance/sample-files/no-compression.nxs
+  // /home/simon/mantid/nexus/load-performance/sample-files/gzip-level6.nxs
+  H5::H5File file(argv[1], H5F_ACC_RDONLY);
 
   std::vector<int> banks = {22,  23,  24,  42,  43,  44,  62,  63,
                             64,  82,  83,  84,  102, 103, 104, 105,
