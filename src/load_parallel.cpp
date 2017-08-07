@@ -6,6 +6,7 @@
 #include <H5Cpp.h>
 
 #include "read.h"
+#include "timer.h"
 
 int main(int argc, char **argv) {
   boost::mpi::environment env;
@@ -26,7 +27,7 @@ int main(int argc, char **argv) {
   std::string name = prefix + std::to_string(banks[0]) + suffix;
   //std::string name = prefix + std::to_string(banks[comm.rank()]) + suffix;
 
-  const auto start = std::chrono::system_clock::now();
+  Timer timer;
   size_t size = 0;
 
   comm.barrier();
@@ -55,12 +56,7 @@ int main(int argc, char **argv) {
   */
   comm.barrier();
 
-  const auto end = std::chrono::system_clock::now();
-
-  std::chrono::duration<double> elapsed = end - start;
-  double seconds = (double)std::chrono::duration_cast<std::chrono::nanoseconds>(
-                       elapsed).count() /
-                   (1000000000);
+  double seconds = timer.checkpoint();
 
   size_t sum;
   boost::mpi::reduce(comm, size, sum, std::plus<size_t>(), 0);
