@@ -5,16 +5,7 @@
 #include <boost/mpi.hpp>
 #include <H5Cpp.h>
 
-template <class T>
-std::vector<T> read(const H5::H5File &file, const std::string &dataSetName) {
-  H5::DataSet dataset = file.openDataSet(dataSetName);
-  H5::DataType dataType = dataset.getDataType();
-  H5::DataSpace dataSpace = dataset.getSpace();
-  std::vector<T> result;
-  result.resize(dataSpace.getSelectNpoints());
-  dataset.read(result.data(), dataType, dataSpace);
-  return result;
-}
+#include "read.h"
 
 int main(int argc, char **argv) {
   boost::mpi::environment env;
@@ -46,7 +37,7 @@ int main(int argc, char **argv) {
                        elapsed).count() /
                    (1000000000);
 
-  const auto size = tof.size() * sizeof(int32_t) + tof.size() * sizeof(float);
+  const auto size = id.size() * sizeof(int32_t) + tof.size() * sizeof(float);
   size_t sum;
   boost::mpi::reduce(comm, size, sum, std::plus<size_t>(), 0);
   if (comm.rank() == 0)
