@@ -22,7 +22,9 @@
 This indeed points to a seeking issue due to unordered chunks.
 Unordered chunks can be expected if chunks for many banks are added constantly to the file during a run.
 
-**Conclusion: Check with DM -- if chunk size is large enough, will the ordering issue and the resulting seeks become irrelevant?**
+As to be expected and confirmed by Tobias Richter: if chunk size is large enough, the ordering issue and the resulting seeks should become irrelevant.
+
+**TODO: Get test file from DM to verify this expectation.**
 
 ## SSD
 
