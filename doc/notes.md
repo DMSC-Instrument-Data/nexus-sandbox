@@ -26,7 +26,13 @@ Unordered chunks can be expected if chunks for many banks are added constantly t
 
 ## SSD
 
+Loading from several processes does give a speedup for test files on a DMSC workstation SSD (*not* real files creates from a stream).
+Test files have been creates by the helper script `scripts/create_file.py`.
+Obtained around 1 GByte/s.
+
 ![SSD load bandwidth](../results/ssd-sample-file.png)
+
+See [MPI](#mpi) for discussion.
 
 ## MPI
 
@@ -34,6 +40,11 @@ Loading from several processes does give a speedup for test files (*not* real fi
 Obtained 600-700 MByte/s with Lustre.
 
 ![Lustre load bandwidth](../results/dmsc-cluster-sample-file.png)
+
+For few MPI ranks the slow GZIP decompression has a big negative effect on performance.
+With increasing number of used cores the relative difference decreases as expected/hoped.
+
+**Conclusion: Given these results with the expected improvement of GZIP with many cores the envisioned loader model with many processes makes sense. As a next step we need to prove that the GZIP compression does not take too much CPU so it does not affect the follow-up stages of loading files.**
 
 No compression:
 ```sh
@@ -70,13 +81,6 @@ $ for i in $(seq 1 12); do /users/simon/software/vmtouch/vmtouch -e $file > /dev
 11 0.207330 bandwidth 617.373687 MB/s size 134217728
 12 0.207408 bandwidth 617.139663 MB/s size 134217728
 ```
-
-Test files have been creates by the helper script `scripts/create_file.py`.
-
-For few MPI ranks the slow GZIP decompression has a big negative effect on performance.
-With increasing number of used cores the relative difference decreases as expected/hoped.
-
-**Conclusion: Given these results with the expected improvement of GZIP with many cores the envisioned loader model with many processes makes sense. As a next step we need to prove that the GZIP compression does not take too much CPU so it does not affect the follow-up stages of loading files.**
 
 ## Lustre
 

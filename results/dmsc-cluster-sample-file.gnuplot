@@ -1,4 +1,4 @@
-set term pdf noenh size 1024,768
+set term png noenh size 1024,768
 set outp "dmsc-cluster-sample-file.png"
 
 set key t l
