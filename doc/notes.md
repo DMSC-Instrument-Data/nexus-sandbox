@@ -24,14 +24,16 @@ Unordered chunks can be expected if chunks for many banks are added constantly t
 
 **Conclusion: Check with DM -- if chunk size is large enough, will the ordering issue and the resulting seeks become irrelevant?**
 
+## SSD
+
+![SSD load bandwidth](../results/ssd-sample-file.png)
+
 ## MPI
 
 Loading from several processes does give a speedup for test files (*not* real files creates from a stream).
 Obtained 600-700 MByte/s with Lustre.
 
 ![Lustre load bandwidth](../results/dmsc-cluster-sample-file.png)
-
-![SSD load bandwidth](../results/ssd-sample-file.png)
 
 No compression:
 ```sh
