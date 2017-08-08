@@ -1,0 +1,14 @@
+# file=/mnt/lustre/users/simon/stripe-test/num-element=33554432_chunk=1048576_compress=gzip.hdf5
+# for i in $(seq 1 16); do /users/simon/software/vmtouch/vmtouch -e $file > /dev/null; echo -n "$i " ; /usr/mpi/intel/openmpi-1.4.3-qlc/bin/mpiexec -n $i ./src/load_parallel $file; done
+1 1.353684 bandwidth 94.556792 MB/s size 134217728
+2 0.739181 bandwidth 173.164733 MB/s size 134217728
+3 0.663640 bandwidth 192.875541 MB/s size 134217728
+4 0.479785 bandwidth 266.786169 MB/s size 134217728
+5 0.328861 bandwidth 389.222703 MB/s size 134217728
+6 0.286930 bandwidth 446.101580 MB/s size 134217728
+7 0.305338 bandwidth 419.207675 MB/s size 134217728
+8 0.231502 bandwidth 552.911618 MB/s size 134217728
+9 0.219579 bandwidth 582.933429 MB/s size 134217728
+10 0.213643 bandwidth 599.130415 MB/s size 134217728
+11 0.207330 bandwidth 617.373687 MB/s size 134217728
+12 0.207408 bandwidth 617.139663 MB/s size 134217728

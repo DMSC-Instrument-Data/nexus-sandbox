@@ -1,0 +1,26 @@
+# file=files/num-element=33554432_chunk=1048576_compress=None.hdf5
+# for i in $(seq 1 24); do /home/simon/software/vmtouch/vmtouch -e $file > /dev/null; echo -n "$i " ; mpirun -n $i ./src/load_parallel $file; done
+1 0.329638 bandwidth 388.304177 MB/s size 134217728
+2 0.224888 bandwidth 569.171960 MB/s size 134217728
+3 0.170577 bandwidth 750.392851 MB/s size 134217728
+4 0.160316 bandwidth 798.424195 MB/s size 134217728
+5 0.149721 bandwidth 854.925804 MB/s size 134217728
+6 0.144144 bandwidth 888.001091 MB/s size 134217728
+7 0.145863 bandwidth 877.535457 MB/s size 134217728
+8 0.130573 bandwidth 980.298234 MB/s size 134217728
+9 0.130858 bandwidth 978.155974 MB/s size 134217728
+10 0.135130 bandwidth 947.239093 MB/s size 134217728
+11 0.129473 bandwidth 988.620736 MB/s size 134217728
+12 0.126285 bandwidth 1013.582031 MB/s size 134217728
+13 0.129561 bandwidth 987.951835 MB/s size 134217728
+14 0.130753 bandwidth 978.943986 MB/s size 134217728
+15 0.126070 bandwidth 1015.310316 MB/s size 134217728
+16 0.114423 bandwidth 1118.655197 MB/s size 134217728
+17 0.116858 bandwidth 1095.343705 MB/s size 134217728
+18 0.115468 bandwidth 1108.529968 MB/s size 134217728
+19 0.119878 bandwidth 1067.750638 MB/s size 134217728
+20 0.118572 bandwidth 1079.516748 MB/s size 134217728
+21 0.116617 bandwidth 1097.607471 MB/s size 134217728
+22 0.115987 bandwidth 1103.570354 MB/s size 134217728
+23 0.121724 bandwidth 1051.558194 MB/s size 134217728
+24 0.121223 bandwidth 1055.908717 MB/s size 134217728
