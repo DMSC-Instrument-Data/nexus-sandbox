@@ -34,7 +34,13 @@ Obtained around 1 GByte/s.
 
 ![SSD load bandwidth](../results/ssd-sample-file.png)
 
-See [MPI](#mpi) for discussion.
+![SSD load bandwidth (larger file)](../results/ssd-large-sample-file.png)
+
+For few MPI ranks the slow GZIP decompression has a big negative effect on performance.
+With increasing number of used cores the relative difference decreases as expected/hoped.
+Ultimately the performance *with* GZIP compression *surpassed* the uncompressed performance since the latter is bound at a lower value by the speed of the underlying device.
+
+**Conclusion: Given these results with the expected improvement of GZIP with many cores the envisioned loader model with many processes makes sense. As a next step we need to prove that the GZIP compression does not take too much CPU so it does not affect the follow-up stages of loading files.**
 
 ## MPI
 
@@ -43,10 +49,7 @@ Obtained 600-700 MByte/s with Lustre.
 
 ![Lustre load bandwidth](../results/dmsc-cluster-sample-file.png)
 
-For few MPI ranks the slow GZIP decompression has a big negative effect on performance.
-With increasing number of used cores the relative difference decreases as expected/hoped.
-
-**Conclusion: Given these results with the expected improvement of GZIP with many cores the envisioned loader model with many processes makes sense. As a next step we need to prove that the GZIP compression does not take too much CPU so it does not affect the follow-up stages of loading files.**
+See [SSD](#ssd) for discussion.
 
 No compression:
 ```sh
