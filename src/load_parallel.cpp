@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <chrono>
 #include <vector>
 
 #include <boost/mpi.hpp>
@@ -14,13 +13,14 @@ int main(int argc, char **argv) {
 
   // /home/simon/mantid/nexus/load-performance/sample-files/no-compression.nxs
   // /home/simon/mantid/nexus/load-performance/sample-files/gzip-level6.nxs
+  // /mnt/extra/simon/neutron-data/VIS_20118.nxs.h5
   H5::H5File file(argv[1], H5F_ACC_RDONLY);
 
   //std::vector<int> banks = {22,  23,  24,  42,  43,  44,  62,  63,
   //                          64,  82,  83,  84,  102, 103, 104, 105,
   //                          106, 123, 124, 143, 144, 164, 184};
 
-  std::vector<int> banks = {28};
+  std::vector<int> banks = {1};
 
   std::string prefix("entry/bank");
   std::string suffix("_events/");
@@ -42,18 +42,12 @@ int main(int argc, char **argv) {
     start += count * comm.size();
     size += data.size() * sizeof(int32_t);
   }
-  }
   /*
-  auto id = read<int32_t>(file, name + "event_id");
-  auto tof = read<float>(file, name + "event_time_offset");
-  {
-  hsize_t start = 0;
-  hsize_t count = 2048*1;
-  while (read<int32_t>(file, name + "event_id", start, count).size() == count) {
-    start += count;
-  }
-  }
+    const auto data = read<int32_t>(file, name + "event_id");
+    size += data.size() * sizeof(int32_t);
   */
+  }
+
   comm.barrier();
 
   double seconds = timer.checkpoint();

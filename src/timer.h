@@ -1,6 +1,9 @@
 #ifndef TIMER_H
 #define TIMER_H
 
+#include <chrono>
+#include <vector>
+
 class Timer {
 public:
   /// Create timer and store initial time stamp.
