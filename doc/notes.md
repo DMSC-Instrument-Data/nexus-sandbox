@@ -28,7 +28,7 @@ As to be expected and confirmed by Tobias Richter: if chunk size is large enough
 
 ## SSD
 
-Loading from several processes does give a speedup for test files on a DMSC workstation SSD (*not* real files creates from a stream).
+Loading from several processes does give a speedup for test files on a DMSC workstation SSD (*not* real files created from a stream).
 Test files have been creates by the helper script `scripts/create_file.py`.
 Obtained around 1 GByte/s.
 
@@ -44,7 +44,7 @@ Ultimately the performance *with* GZIP compression *surpassed* the uncompressed 
 
 ## MPI
 
-Loading from several processes does give a speedup for test files (*not* real files creates from a stream).
+Loading from several processes does give a speedup for test files (*not* real files created from a stream).
 Obtained 600-700 MByte/s with Lustre.
 
 ![Lustre load bandwidth](../results/dmsc-cluster-sample-file.png)
