@@ -37,15 +37,20 @@ def get_filename(args):
         return path + filename + ".hdf5"
     return "{}events-{}_banks-{}_pixels-{}_chunk-{}_compress-{}.hdf5".format(get_path(args), int(args.events), args.banks, args.pixels, args.chunk, get_compression(args))
 
+NXevent_data_names = ['event_index', 'event_time_zero', 'event_id', 'event_time_offset']
+NXevent_data_dtypes = ['i4', 'i8', 'i4', 'i4']
+
 def make_bank(instrument, index, chunk, compression):
     event_data = instrument.create_group("events-{}".format(index))
     event_data.attrs['NXclass'] = 'NXevent_data'
-    event_id = event_data.create_dataset("event_id", (0,), dtype='i4', chunks=chunk, compression=compression, maxshape=(None,))
-    event_index = event_data.create_dataset("event_index", (0,), dtype='i4', chunks=chunk, compression=compression, maxshape=(None,))
-    event_time_offset = event_data.create_dataset("event_time_offset", (0,), dtype='i4', chunks=chunk, compression=compression, maxshape=(None,))
-    event_time_zero = event_data.create_dataset("event_time_zero", (0,), dtype='i8', chunks=chunk, compression=compression, maxshape=(None,))
+    for name, dtype in zip(NXevent_data_names, NXevent_data_dtypes):
+        event_data.create_dataset(name, (0,), dtype=dtype, chunks=chunk, compression=compression, maxshape=(None,))
     return event_data
 
+def extend_bank(bank, delta):
+    NXevent_data_increments = [1, 1, delta, delta]
+    for name, delta in zip(NXevent_data_names, NXevent_data_increments):
+        bank[name].resize(bank[name].size + delta, axis = 0)
 
 filename = get_filename(args)
 
@@ -75,20 +80,9 @@ while total_events < max_events:
     for i, bank in enumerate(instrument.values()):
         n_event = int(bank_load_factor[i] * n_event_base)
         total_events += n_event
-        event_id = bank['event_id']
-        index = event_id.size
-        event_id.resize(index + n_event, axis=0)
-        event_id[index:] = numpy.random.randint(i*bank_offset, i*bank_offset+bank_size, size=n_event, dtype=numpy.int32)
-
-        event_index = bank['event_index']
-        event_index.resize(pulse + 1, axis=0)
-        event_index[pulse] = index
-
-        event_time_offset = bank['event_time_offset']
-        event_time_offset.resize(index + n_event, axis=0)
-        event_time_offset[index:] = numpy.random.randint(10000, 20000, size=n_event, dtype=numpy.int32)
-
-        event_time_zero = bank['event_time_zero']
-        event_time_zero.resize(pulse + 1, axis=0)
-        event_time_zero[pulse] = pulse * 100000
+        extend_bank(bank, n_event)
+        bank['event_index'][-1:] = bank['event_id'].size
+        bank['event_time_zero'][-1:] = pulse * 100000
+        bank['event_id'][-n_event:] = numpy.random.randint(i*bank_offset, i*bank_offset+bank_size, size=n_event, dtype=numpy.int32)
+        bank['event_time_offset'][-n_event:] = numpy.random.randint(10000, 20000, size=n_event, dtype=numpy.int32)
     pulse += 1
