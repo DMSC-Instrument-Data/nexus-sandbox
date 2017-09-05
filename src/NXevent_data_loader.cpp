@@ -10,6 +10,12 @@ NXEventDataLoader::NXEventDataLoader(const H5::H5File &file,
   m_event_time_zero = read<int64_t>(file, m_NXEventDataPath + "/event_time_zero");
 }
 
+size_t NXEventDataLoader::numberOfEvents() const {
+  H5::DataSet dataset = m_file.openDataSet(m_event_id_path);
+  H5::DataSpace dataSpace = dataset.getSpace();
+  return dataSpace.getSelectNpoints();
+}
+
 const std::vector<int32_t> &NXEventDataLoader::eventIndex() const {
   return m_event_index;
 }

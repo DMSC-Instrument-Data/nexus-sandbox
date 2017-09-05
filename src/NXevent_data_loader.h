@@ -10,6 +10,7 @@ class NXEventDataLoader {
 public:
   NXEventDataLoader(const H5::H5File &file, const std::string &nxEventDataPath);
 
+  size_t numberOfEvents() const;
   const std::vector<int32_t> &eventIndex() const;
   const std::vector<int64_t> &eventTimeZero() const;
   std::vector<int32_t> readEventID(hsize_t start, hsize_t count) const;
