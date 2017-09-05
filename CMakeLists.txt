@@ -6,6 +6,5 @@ set( CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE )
 
 find_package ( HDF5 COMPONENTS CXX HL REQUIRED )
 find_package ( MPI REQUIRED )
-find_package ( Boost REQUIRED mpi )
 
 add_subdirectory ( src )

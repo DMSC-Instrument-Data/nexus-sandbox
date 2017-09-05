@@ -1,15 +1,18 @@
 #include <stdio.h>
 #include <vector>
 
-#include <boost/mpi.hpp>
+#include <mpi.h>
 #include <H5Cpp.h>
 
 #include "read.h"
 #include "timer.h"
 
 int main(int argc, char **argv) {
-  boost::mpi::environment env;
-  boost::mpi::communicator comm;
+  MPI_Init(&argc, &argv);
+  int rank;
+  int world_size;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
   // /home/simon/mantid/nexus/load-performance/sample-files/no-compression.nxs
   // /home/simon/mantid/nexus/load-performance/sample-files/gzip-level6.nxs
@@ -30,16 +33,16 @@ int main(int argc, char **argv) {
   Timer timer;
   size_t size = 0;
 
-  comm.barrier();
+  MPI_Barrier(MPI_COMM_WORLD);
 
   {
   hsize_t count = 2048*1024;
-  hsize_t start = count * comm.rank();
+  hsize_t start = count * rank;
   while (true) {
     const auto data = read<int32_t>(file, name + "event_id", start, count);
     if(data.empty())
       break;
-    start += count * comm.size();
+    start += count * world_size;
     size += data.size() * sizeof(int32_t);
   }
   /*
@@ -48,13 +51,15 @@ int main(int argc, char **argv) {
   */
   }
 
-  comm.barrier();
+  MPI_Barrier(MPI_COMM_WORLD);
 
   double seconds = timer.checkpoint();
 
   size_t sum;
-  boost::mpi::reduce(comm, size, sum, std::plus<size_t>(), 0);
-  if (comm.rank() == 0)
+  MPI_Reduce(&size, &sum, 1, MPI_UINT64_T, MPI_SUM, 0, MPI_COMM_WORLD);
+  if (rank == 0)
     printf("%f bandwidth %f MB/s size %lu\n", seconds,
            static_cast<double>(sum) / seconds / (1024 * 1024), sum);
+
+  MPI_Finalize();
 }
