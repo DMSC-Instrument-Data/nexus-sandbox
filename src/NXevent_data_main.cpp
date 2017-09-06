@@ -18,7 +18,7 @@ struct Event {
 // which we do not support here for now). Thus we keep things in 32 bit for
 // performance.
 void event_id_to_GlobalSpectrumIndex(const int32_t event_id_offset,
-                                      std::vector<int32_t> data) {
+                                      std::vector<int32_t> &data) {
   // For now we assume that the event_id is contiguous within a bank, so
   // translation is just a fixed offset.
   std::for_each(data.begin(), data.end(),
@@ -89,27 +89,30 @@ redistribute_data(const std::vector<std::vector<T>> &data) {
   return result;
 }
 
+struct MantidEvent {
+  MantidEvent(double tof, int64_t pulse_time)
+      : tof(tof), pulse_time(pulse_time) {}
+  double tof;
+  int64_t pulse_time;
+};
+
+template <class T>
+void append_to_workspace(const int nrank,
+                         std::vector<std::vector<MantidEvent>> &workspace,
+                         const std::vector<T> &events) {
+  for (const auto &event : events) {
+    auto index = event.index / nrank; // global index to local index
+    workspace[index].emplace_back(
+        static_cast<double>(event.tof), event.pulse_time);
+  }
+}
+
 int main(int argc, char **argv) {
   MPI_Init(&argc, &argv);
   int rank;
   int nrank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &nrank);
-
-  /*
-  std::vector<std::vector<int32_t>> data(nrank);
-  for(size_t i=0; i<data.size(); ++i)
-    data[i].resize(rank, 1000*rank + i);
-  const auto &result = redistribute_data(data);
-  for(const auto &i:result)
-    printf("%d %d\n", rank, i);
-    */
-
-
-
-
-
-
 
   H5::H5File file(argv[1], H5F_ACC_RDONLY);
   size_t n_events = 0;
@@ -133,18 +136,31 @@ int main(int argc, char **argv) {
   const size_t n_event = loader.numberOfEvents();
   const auto &event_index = loader.eventIndex();
   const auto &event_time_zero = loader.eventTimeZero();
-  const auto &event_id = loader.readEventID(0, n_event);
+  auto event_id = loader.readEventID(0, n_event);
   const auto &event_time_offset = loader.readEventTimeOffset(0, n_event);
+  timer.checkpoint();
 
-  event_id_to_GlobalSpectrumIndex(100000, event_id);
+  event_id_to_GlobalSpectrumIndex(100000*rank, event_id);
+  timer.checkpoint();
   // event_id is now actually event_global_spectrum_index
   const auto &events = build_event_vector(event_index, event_time_zero, event_id, event_time_offset);
+  timer.checkpoint();
   const auto &events_for_ranks = split_for_ranks(nrank, events);
-  const auto &event_for_this_rank = redistribute_data(events_for_ranks);
+  timer.checkpoint();
+  const auto &events_for_this_rank = redistribute_data(events_for_ranks);
+  timer.checkpoint();
+  int num_loaded_banks = nrank;
+  int pixels_per_bank = 10000;
+  std::vector<std::vector<MantidEvent>> workspace(
+      (num_loaded_banks * pixels_per_bank) / nrank);
+  append_to_workspace(nrank, workspace, events_for_this_rank);
+  timer.checkpoint();
 
-  for(size_t i=0; i<10; ++i) {
-    const auto event = event_for_this_rank[i];
-    printf("%d %d %d %ld\n", rank, event.index, event.tof, event.pulse_time);
+  if (rank == 0) {
+    printf("HDF5-load id-to-index event-vec split-ranks MPI make-worksapce\n");
+    for (const auto seconds : timer.deltas())
+      printf("%lf ", seconds);
+    printf("\n");
   }
 
   MPI_Finalize();
