@@ -75,8 +75,10 @@ build_event_vector(const LoadRange &range,
 
 template <class T>
 std::vector<std::vector<T>> split_for_ranks(const int nrank,
-                                              std::vector<T> data) {
+                                            const std::vector<T> &data) {
   std::vector<std::vector<T>> rank_data(nrank);
+  for(auto &item : rank_data)
+    item.reserve(150000000/nrank);
   for (const auto &item : data) {
     int rank = item.index % nrank;
     rank_data[rank].push_back(item);
@@ -177,22 +179,43 @@ std::vector<LoadRange> determineLoadRanges(int nrank, int rank, H5::H5File &file
     ++it;
   }
   return ranges;
+}
 
+std::vector<LoadRange> determineChunkedLoadRanges(int nrank, int rank, H5::H5File &file) {
+  size_t chunk_size = 1024*1024; // element count in chunk
+  // Work balancing should take into account total number of events and then
+  // chunk things up for MPI
+  size_t n_events{0};
+  std::vector<size_t> bank_sizes;
+  for (int i = 0; i < 7; ++i) {
+    H5::DataSet dataset = file.openDataSet("entry/instrument/events-" +
+                                           std::to_string(i) + "/event_id");
+    H5::DataSpace dataSpace = dataset.getSpace();
+    bank_sizes.push_back(dataSpace.getSelectNpoints());
+    n_events += bank_sizes.back();
+  }
+  printf("total events %lu\n", n_events);
 
-
-
-
-  /*
-  size_t current = 0;
-  for(size_t bank=0; bank<bank_sizes.size(); ++bank) {
-    const auto bank_size = bank_sizes) {
-    current += bank_size;
-    if(first < current) {
-      if(last < current)
-        range.push_back(LoadRange(
+  size_t chunk = 0;
+  std::vector<LoadRange> ranges;
+  for (int bank = 0; bank < 7; ++bank) {
+    size_t current = 0;
+    while (current < bank_sizes[bank]) {
+      if (chunk % nrank == rank) {
+        hsize_t count =
+            std::min(current + chunk_size, bank_sizes[bank]) - current;
+        ranges.push_back(LoadRange{bank, current, count});
+      }
+      current += chunk_size;
+      chunk++;
     }
   }
-  */
+  while (chunk % nrank != 0) {
+    if (chunk % nrank == rank)
+        ranges.push_back(LoadRange{0, 0, 0});
+    chunk++;
+  }
+  return ranges;
 }
 
 int main(int argc, char **argv) {
@@ -213,8 +236,7 @@ int main(int argc, char **argv) {
   int pixels_per_bank = 10000;
   std::vector<std::vector<MantidEvent>> workspace(
       (num_loaded_banks * pixels_per_bank) / nrank);
-  std::vector<Event> events;
-  for (const auto &range : determineLoadRanges(nrank, rank, file)) {
+  for (const auto &range : determineChunkedLoadRanges(nrank, rank, file)) {
     NXEventDataLoader loader(file, "entry/instrument/events-" +
                                        std::to_string(range.bank));
     // TODO avoid reallocating many times. Reuse buffer (double buffering when
@@ -230,19 +252,16 @@ int main(int argc, char **argv) {
     event_id_to_GlobalSpectrumIndex(100000 * range.bank, event_id);
     timer.checkpoint();
     // event_id is now actually event_global_spectrum_index
-    const auto &events_this_range = build_event_vector(
-        range, event_index, event_time_zero, event_id, event_time_offset);
-    events.insert(events.end(), events_this_range.begin(),
-                  events_this_range.end());
+    const auto &events = build_event_vector(range, event_index, event_time_zero,
+                                            event_id, event_time_offset);
+    timer.checkpoint();
+    const auto &events_for_ranks = split_for_ranks(nrank, events);
+    timer.checkpoint();
+    const auto &events_for_this_rank = redistribute_data(events_for_ranks);
+    timer.checkpoint();
+    append_to_workspace(nrank, workspace, events_for_this_rank);
+    timer.checkpoint();
   }
-  timer.checkpoint();
-  printf("%lu\n", events.size());
-  const auto &events_for_ranks = split_for_ranks(nrank, events);
-  timer.checkpoint();
-  const auto &events_for_this_rank = redistribute_data(events_for_ranks);
-  timer.checkpoint();
-  append_to_workspace(nrank, workspace, events_for_this_rank);
-  timer.checkpoint();
 
   if (rank == 0) {
     printf("HDF5-load id-to-index event-vec split-ranks MPI make-worksapce\n");
