@@ -33,9 +33,10 @@ build_event_vector(const std::vector<int32_t> &event_index,
   std::vector<Event> events(event_time_offset.size());
   for (size_t pulse = 0; pulse < event_index.size(); ++pulse) {
     size_t base = event_index[pulse];
-    size_t count = (pulse != event_index.size() - 1
-                        ? event_index[pulse + 1]
-                        : (event_time_offset.size()) - event_index[pulse]);
+    size_t count =
+        (pulse != event_index.size() - 1 ? event_index[pulse + 1]
+                                         : event_time_offset.size()) -
+        event_index[pulse];
     for (size_t offset = 0; offset < count; ++offset) {
       size_t i = base + offset;
       events[i] = {event_global_spectrum_index[i], event_time_offset[i],
