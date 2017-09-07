@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <xmmintrin.h>
 #include <mpi.h>
 #include <algorithm>
 #include <string>
@@ -137,6 +138,7 @@ void append_to_workspace(const int nrank,
     auto index = event.index / nrank; // global index to local index
     workspace[index].emplace_back(
         static_cast<double>(event.tof), event.pulse_time);
+    _mm_prefetch(&workspace[index].back() + 1, _MM_HINT_T1);
   }
 }
 
