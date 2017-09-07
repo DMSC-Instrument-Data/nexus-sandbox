@@ -91,8 +91,8 @@ void redistribute_data(std::vector<T> &result,
   std::transform(data.cbegin(), data.cend(), sizes.begin(),
                  [](const std::vector<T> &vec) { return vec.size(); });
   std::vector<size_t> rec_sizes(data.size());
-  MPI_Alltoall(sizes.data(), 1, MPI_UINT64_T, rec_sizes.data(), 1, MPI_UINT64_T,
-               MPI_COMM_WORLD);
+  MPI_Alltoall(sizes.data(), 1, MPI_UNSIGNED_LONG, rec_sizes.data(), 1,
+               MPI_UNSIGNED_LONG, MPI_COMM_WORLD);
 
   std::vector<MPI_Request> send_requests(data.size());
   for (int rank = 0; rank < data.size(); ++rank) {
