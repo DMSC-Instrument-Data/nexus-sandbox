@@ -105,13 +105,16 @@ void redistribute_data(std::vector<T> &result,
   size_t total_size = std::accumulate(rec_sizes.begin(), rec_sizes.end(), 0);
   result.resize(total_size);
   size_t offset = 0;
+  int this_rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &this_rank);
   for (int rank = 0; rank < data.size(); ++rank) {
     int tag = 0;
-    MPI_Recv(result.data() + offset, rec_sizes[rank] * sizeof(T), MPI_CHAR,
-             rank, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    offset += rec_sizes[rank];
+    // Receive from rank with offset to balance network load.
+    int rank2 = (rank + this_rank)%data.size();
+    MPI_Recv(result.data() + offset, rec_sizes[rank2] * sizeof(T), MPI_CHAR,
+             rank2, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    offset += rec_sizes[rank2];
     // TODO
-    // 1. everyone is receiving data from rank 0 first, slowing things down?
     // 2. do work between sending and receiving (next range, or insert into
     // workspace after first data was received?).
   }
