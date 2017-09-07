@@ -6,6 +6,8 @@
 #include "NXevent_data_loader.h"
 #include "timer.h"
 
+constexpr size_t bank_size = 1000;
+
 struct Event {
   int32_t index; // global spectrum index
   int32_t tof;
@@ -135,6 +137,16 @@ void append_to_workspace(const int nrank,
   }
 }
 
+size_t readEventCount(H5::H5File &file) {
+  size_t n_events{0};
+  for (int i = 0; i < 7; ++i) {
+    H5::DataSet dataset = file.openDataSet("entry/instrument/events-" +
+                                           std::to_string(i) + "/event_id");
+    H5::DataSpace dataSpace = dataset.getSpace();
+    n_events += dataSpace.getSelectNpoints();
+  }
+  return static_cast<size_t>(n_events);
+}
 
 std::vector<LoadRange> determineLoadRanges(int nrank, int rank, H5::H5File &file) {
   // Work balancing should take into account total number of events and then
@@ -148,7 +160,6 @@ std::vector<LoadRange> determineLoadRanges(int nrank, int rank, H5::H5File &file
     bank_sizes.push_back(dataSpace.getSelectNpoints());
     n_events += bank_sizes.back();
   }
-  printf("total events %lu\n", n_events);
 
   std::vector<size_t> bank_ends(bank_sizes);
   for (size_t i = 1; i < bank_ends.size(); ++i)
@@ -193,7 +204,6 @@ std::vector<LoadRange> determineChunkedLoadRanges(int nrank, int rank, H5::H5Fil
     bank_sizes.push_back(dataSpace.getSelectNpoints());
     n_events += bank_sizes.back();
   }
-  printf("total events %lu\n", n_events);
 
   size_t chunk = 0;
   std::vector<LoadRange> ranges;
@@ -231,9 +241,8 @@ int main(int argc, char **argv) {
   //  printf("%d %d %llu %llu\n", rank, range.bank, range.start, range.count);
 
   int num_loaded_banks = 7;
-  int pixels_per_bank = 10000;
   std::vector<std::vector<MantidEvent>> workspace(
-      (num_loaded_banks * pixels_per_bank) / nrank + 1);
+      (num_loaded_banks * bank_size) / nrank + 1);
   std::vector<Event> events;
   std::vector<std::vector<Event>> events_for_ranks(nrank);
   std::vector<Event> &events_for_this_rank = events;
@@ -252,7 +261,7 @@ int main(int argc, char **argv) {
         loader.readEventTimeOffset(range.start, range.count);
     timer.checkpoint();
 
-    event_id_to_GlobalSpectrumIndex(100000 * range.bank, event_id);
+    event_id_to_GlobalSpectrumIndex(10 * bank_size * range.bank, event_id);
     timer.checkpoint();
     // event_id is now actually event_global_spectrum_index
     build_event_vector(events, range, event_index, event_time_zero,
@@ -271,10 +280,13 @@ int main(int argc, char **argv) {
 
   if (rank == 0) {
     printf("HDF5-load id-to-index event-vec split-ranks MPI make-worksapce\n");
-    printf("xxx ");
-    for (const auto seconds : deltas)
-      printf("%lf ", seconds);
-    printf("\n");
+    double sum{0.0};
+    for (const auto seconds : deltas) {
+      sum += seconds;
+      printf("%.3lf ", seconds);
+    }
+    auto n_event = readEventCount(file);
+    printf("total %.2lf | %.1e events/s\n", sum, n_event/sum);
   }
 
   MPI_Finalize();
