@@ -95,32 +95,35 @@ void redistribute_data(std::vector<T> &result,
   MPI_Alltoall(sizes.data(), 1, MPI_UNSIGNED_LONG, rec_sizes.data(), 1,
                MPI_UNSIGNED_LONG, MPI_COMM_WORLD);
 
-  std::vector<MPI_Request> send_requests(data.size());
-  for (int rank = 0; rank < data.size(); ++rank) {
-    const auto &vec = data[rank];
-    int tag = 0;
-    MPI_Isend(vec.data(), vec.size() * sizeof(T), MPI_CHAR, rank, tag, MPI_COMM_WORLD,
-              &send_requests[rank]);
-  }
-
   size_t total_size = std::accumulate(rec_sizes.begin(), rec_sizes.end(), 0);
   result.resize(total_size);
   size_t offset = 0;
   int this_rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &this_rank);
+  std::vector<MPI_Request> recv_requests(data.size());
   for (int rank = 0; rank < data.size(); ++rank) {
     int tag = 0;
     // Receive from rank with offset to balance network load.
     int rank2 = (rank + this_rank)%data.size();
-    MPI_Recv(result.data() + offset, rec_sizes[rank2] * sizeof(T), MPI_CHAR,
-             rank2, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Irecv(result.data() + offset, rec_sizes[rank2] * sizeof(T), MPI_CHAR,
+             rank2, tag, MPI_COMM_WORLD, &recv_requests[rank2]);
     offset += rec_sizes[rank2];
     // TODO
     // 2. do work between sending and receiving (next range, or insert into
     // workspace after first data was received?).
   }
 
+  std::vector<MPI_Request> send_requests(data.size());
+  for (int rank = 0; rank < data.size(); ++rank) {
+    int rank2 = (rank + this_rank)%data.size();
+    const auto &vec = data[rank2];
+    int tag = 0;
+    MPI_Isend(vec.data(), vec.size() * sizeof(T), MPI_CHAR, rank2, tag,
+              MPI_COMM_WORLD, &send_requests[rank2]);
+  }
+
   MPI_Waitall(data.size(), send_requests.data(), MPI_STATUSES_IGNORE);
+  MPI_Waitall(data.size(), recv_requests.data(), MPI_STATUSES_IGNORE);
 }
 
 struct MantidEvent {
