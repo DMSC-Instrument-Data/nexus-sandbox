@@ -58,13 +58,13 @@ void build_event_vector(std::vector<Event> &events, const LoadRange &range,
   for (size_t pulse = start_pulse; pulse < end_pulse; ++pulse) {
     size_t start =
         std::max(range.start, static_cast<hsize_t>(event_index[pulse])) -
-        event_index[pulse];
+        range.start;
     size_t end =
         std::min(range.start + range.count,
                  static_cast<hsize_t>(pulse != event_index.size() - 1
                                           ? event_index[pulse + 1]
                                           : event_time_offset.size())) -
-        event_index[pulse];
+        range.start;
 
     for (size_t i = start; i < end; ++i) {
       events[i] = {event_global_spectrum_index[i], event_time_offset[i],
@@ -278,6 +278,13 @@ int main(int argc, char **argv) {
       deltas[i] += seconds[i];
   }
 
+  size_t n_event_in_local_workspace{0};
+  size_t n_event_in_workspace{0};
+  for (const auto &item : workspace)
+    n_event_in_local_workspace += item.size();
+  MPI_Reduce(&n_event_in_local_workspace, &n_event_in_workspace, 1,
+             MPI_UNSIGNED_LONG, MPI_SUM, 0, MPI_COMM_WORLD);
+
   if (rank == 0) {
     printf("HDF5-load id-to-index event-vec split-ranks MPI make-worksapce\n");
     double sum{0.0};
@@ -287,6 +294,8 @@ int main(int argc, char **argv) {
     }
     auto n_event = readEventCount(file);
     printf("total %.2lf | %.1e events/s\n", sum, n_event/sum);
+    if (n_event != n_event_in_workspace)
+      throw std::runtime_error("lost events\n");
   }
 
   MPI_Finalize();
