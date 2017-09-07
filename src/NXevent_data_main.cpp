@@ -3,6 +3,9 @@
 #include <mpi.h>
 #include <algorithm>
 #include <string>
+#include <future>
+#include <thread>
+#include <tuple>
 
 #include "NXevent_data_loader.h"
 #include "timer.h"
@@ -235,6 +238,18 @@ std::vector<LoadRange> determineChunkedLoadRanges(int nrank, int rank, H5::H5Fil
   return ranges;
 }
 
+std::tuple<std::vector<int32_t>, std::vector<int64_t>, std::vector<int32_t>,
+           std::vector<int32_t>>
+load(H5::H5File &file, const LoadRange &range) {
+  NXEventDataLoader loader(file, "entry/instrument/events-" +
+                                     std::to_string(range.bank));
+  // TODO avoid reallocating many times. Reuse buffer (double buffering when
+  // threaded?)
+  return std::make_tuple(loader.eventIndex(), loader.eventTimeZero(),
+          loader.readEventID(range.start, range.count),
+          loader.readEventTimeOffset(range.start, range.count));
+}
+
 int main(int argc, char **argv) {
   MPI_Init(&argc, &argv);
   int rank;
@@ -255,18 +270,30 @@ int main(int argc, char **argv) {
   std::vector<std::vector<Event>> events_for_ranks(nrank);
   std::vector<Event> &events_for_this_rank = events;
   std::vector<double> deltas(6, 0.0);
-  for (const auto &range : determineChunkedLoadRanges(nrank, rank, file)) {
+
+  std::future<std::tuple<std::vector<int32_t>, std::vector<int64_t>,
+                         std::vector<int32_t>, std::vector<int32_t>>> future[2];
+  const auto ranges = determineChunkedLoadRanges(nrank, rank, file);
+
+  int load_index = 0;
+  future[load_index] =
+      std::async(std::launch::async, load, std::ref(file), ranges[0]);
+  load_index = (load_index + 1) % 2;
+  for (size_t range_index = 0; range_index < ranges.size(); ++range_index) {
+    const auto range = ranges[range_index];
     Timer timer;
-    NXEventDataLoader loader(file, "entry/instrument/events-" +
-                                       std::to_string(range.bank));
-    // TODO avoid reallocating many times. Reuse buffer (double buffering when
-    // threaded?)
-    const size_t n_event = loader.numberOfEvents();
-    const auto &event_index = loader.eventIndex();
-    const auto &event_time_zero = loader.eventTimeZero();
-    auto event_id = loader.readEventID(range.start, range.count);
-    const auto &event_time_offset =
-        loader.readEventTimeOffset(range.start, range.count);
+
+    if (range_index != ranges.size() - 1)
+      future[load_index] = std::async(std::launch::async, load, std::ref(file),
+                                      ranges[range_index + 1]);
+    load_index = (load_index + 1) % 2;
+
+    future[load_index].wait();
+    auto result = future[load_index].get();
+    auto event_index = std::get<0>(result);
+    auto event_time_zero = std::get<1>(result);
+    auto event_id = std::get<2>(result);
+    auto event_time_offset = std::get<3>(result);
     timer.checkpoint();
 
     event_id_to_GlobalSpectrumIndex(10 * bank_size * range.bank, event_id);
