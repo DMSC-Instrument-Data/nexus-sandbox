@@ -282,16 +282,16 @@ std::vector<LoadRange> determineChunkedLoadRanges(int nrank, int rank, H5::H5Fil
   return ranges;
 }
 
-std::tuple<std::vector<int32_t>, std::vector<int64_t>, std::vector<int32_t>,
-           std::vector<int32_t>>
-load(H5::H5File &file, const LoadRange &range) {
+std::tuple<std::vector<int32_t>, std::vector<int64_t>>
+load(std::vector<int32_t> &event_id, std::vector<int32_t> &event_time_offset,
+     H5::H5File &file, const LoadRange &range) {
   NXEventDataLoader loader(file, "entry/instrument/events-" +
                                      std::to_string(range.bank));
   // TODO avoid reallocating many times. Reuse buffer (double buffering when
   // threaded?)
-  return std::make_tuple(loader.eventIndex(), loader.eventTimeZero(),
-          loader.readEventID(range.start, range.count),
-          loader.readEventTimeOffset(range.start, range.count));
+  loader.readEventTimeOffset(event_time_offset, range.start, range.count);
+  loader.readEventID(event_id, range.start, range.count);
+  return std::make_tuple(loader.eventIndex(), loader.eventTimeZero());
 }
 
 int main(int argc, char **argv) {
@@ -304,9 +304,6 @@ int main(int argc, char **argv) {
   H5::H5File file(argv[1], H5F_ACC_RDONLY);
   size_t n_events = 0;
 
-  //for(const auto &range : ranges)
-  //  printf("%d %d %llu %llu\n", rank, range.bank, range.start, range.count);
-
   int num_loaded_banks = 7;
   std::vector<std::vector<MantidEvent>> workspace(
       (num_loaded_banks * bank_size) / nrank + 1);
@@ -314,38 +311,41 @@ int main(int argc, char **argv) {
   std::vector<std::vector<Event>> events_for_ranks(nrank);
   std::vector<Event> &events_for_this_rank = events;
   std::vector<double> deltas(5, 0.0);
+  std::vector<int32_t> event_id[2];
+  std::vector<int32_t> event_time_offset[2];
 
-  std::future<std::tuple<std::vector<int32_t>, std::vector<int64_t>,
-                         std::vector<int32_t>, std::vector<int32_t>>> future[2];
+  std::future<std::tuple<std::vector<int32_t>, std::vector<int64_t>>> future[2];
   const auto ranges = determineChunkedLoadRanges(nrank, rank, file);
 
   int load_index = 0;
-  future[load_index] =
-      std::async(std::launch::async, load, std::ref(file), ranges[0]);
+  future[load_index] = std::async(
+      std::launch::async, load, std::ref(event_id[load_index]),
+      std::ref(event_time_offset[load_index]), std::ref(file), ranges[0]);
   load_index = (load_index + 1) % 2;
   for (size_t range_index = 0; range_index < ranges.size(); ++range_index) {
     const auto range = ranges[range_index];
     Timer timer;
 
     if (range_index != ranges.size() - 1)
-      future[load_index] = std::async(std::launch::async, load, std::ref(file),
-                                      ranges[range_index + 1]);
+      future[load_index] =
+          std::async(std::launch::async, load, std::ref(event_id[load_index]),
+                     std::ref(event_time_offset[load_index]), std::ref(file),
+                     ranges[range_index + 1]);
     load_index = (load_index + 1) % 2;
 
     future[load_index].wait();
     auto result = future[load_index].get();
     auto event_index = std::get<0>(result);
     auto event_time_zero = std::get<1>(result);
-    auto event_id = std::get<2>(result);
-    auto event_time_offset = std::get<3>(result);
     timer.checkpoint();
 
-    event_id_to_GlobalSpectrumIndex(10 * bank_size * range.bank, event_id);
+    event_id_to_GlobalSpectrumIndex(10 * bank_size * range.bank,
+                                    event_id[load_index]);
     timer.checkpoint();
     // event_id is now actually event_global_spectrum_index
-    build_event_vector_and_split_for_ranks(events_for_ranks, nrank, range,
-                                           event_index, event_time_zero,
-                                           event_id, event_time_offset);
+    build_event_vector_and_split_for_ranks(
+        events_for_ranks, nrank, range, event_index, event_time_zero,
+        event_id[load_index], event_time_offset[load_index]);
     //build_event_vector(events, range, event_index, event_time_zero,
     //                                        event_id, event_time_offset);
     //timer.checkpoint();

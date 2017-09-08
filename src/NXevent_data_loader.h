@@ -15,6 +15,10 @@ public:
   const std::vector<int64_t> &eventTimeZero() const;
   std::vector<int32_t> readEventID(hsize_t start, hsize_t count) const;
   std::vector<int32_t> readEventTimeOffset(hsize_t start, hsize_t count) const;
+  void readEventID(std::vector<int32_t> &event_id, hsize_t start,
+                   hsize_t count) const;
+  void readEventTimeOffset(std::vector<int32_t> &event_time_offset,
+                           hsize_t start, hsize_t count) const;
 
 private:
   const H5::H5File &m_file;

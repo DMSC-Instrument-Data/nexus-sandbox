@@ -32,3 +32,15 @@ std::vector<int32_t>
 NXEventDataLoader::readEventTimeOffset(hsize_t start, hsize_t count) const {
   return read<int32_t>(m_file, m_event_time_offset_path, start, count);
 }
+
+void NXEventDataLoader::readEventID(std::vector<int32_t> &event_id,
+                                    hsize_t start, hsize_t count) const {
+  read<int32_t>(event_id, m_file, m_event_id_path, start, count);
+}
+
+void NXEventDataLoader::readEventTimeOffset(
+    std::vector<int32_t> &event_time_offset, hsize_t start,
+    hsize_t count) const {
+  read<int32_t>(event_time_offset, m_file, m_event_time_offset_path, start,
+                count);
+}
