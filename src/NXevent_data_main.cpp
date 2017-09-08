@@ -10,7 +10,7 @@
 #include "NXevent_data_loader.h"
 #include "timer.h"
 
-constexpr size_t bank_size = 1000;
+constexpr size_t bank_size = 10000;
 
 struct Event {
   int32_t index; // global spectrum index
@@ -85,6 +85,50 @@ void split_for_ranks(std::vector<std::vector<T>> &rank_data, const int nrank,
   for (const auto &item : data) {
     int rank = item.index % nrank;
     rank_data[rank].push_back(item);
+    _mm_prefetch(&rank_data[rank].back() + 4, _MM_HINT_T1);
+  }
+}
+
+template <class T>
+void build_event_vector_and_split_for_ranks(
+    std::vector<std::vector<T>> &rank_data, const int nrank,
+    const LoadRange &range, const std::vector<int32_t> &event_index,
+    const std::vector<int64_t> &event_time_zero,
+    const std::vector<int32_t> &event_global_spectrum_index,
+    const std::vector<int32_t> &event_time_offset) {
+  for (auto &item : rank_data)
+    item.clear();
+
+  size_t start_pulse = 0;
+  size_t end_pulse = 0;
+  for (size_t pulse = 0; pulse < event_index.size(); ++pulse) {
+    size_t count =
+        (pulse != event_index.size() - 1 ? event_index[pulse + 1]
+                                         : event_time_offset.size()) -
+        event_index[pulse];
+    if (range.start >= event_index[pulse] &&
+        range.start < event_index[pulse] + count)
+      start_pulse = pulse;
+    if (range.start + range.count > event_index[pulse] &&
+        range.start + range.count <= event_index[pulse] + count)
+      end_pulse = pulse + 1;
+  }
+  for (size_t pulse = start_pulse; pulse < end_pulse; ++pulse) {
+    size_t start =
+        std::max(range.start, static_cast<hsize_t>(event_index[pulse])) -
+        range.start;
+    size_t end =
+        std::min(range.start + range.count,
+                 static_cast<hsize_t>(pulse != event_index.size() - 1
+                                          ? event_index[pulse + 1]
+                                          : event_time_offset.size())) -
+        range.start;
+
+    for (size_t i = start; i < end; ++i) {
+      int rank = event_global_spectrum_index[i] % nrank;
+      rank_data[rank].push_back({event_global_spectrum_index[i],
+                                 event_time_offset[i], event_time_zero[pulse]});
+    }
   }
 }
 
@@ -269,7 +313,7 @@ int main(int argc, char **argv) {
   std::vector<Event> events;
   std::vector<std::vector<Event>> events_for_ranks(nrank);
   std::vector<Event> &events_for_this_rank = events;
-  std::vector<double> deltas(6, 0.0);
+  std::vector<double> deltas(5, 0.0);
 
   std::future<std::tuple<std::vector<int32_t>, std::vector<int64_t>,
                          std::vector<int32_t>, std::vector<int32_t>>> future[2];
@@ -299,10 +343,13 @@ int main(int argc, char **argv) {
     event_id_to_GlobalSpectrumIndex(10 * bank_size * range.bank, event_id);
     timer.checkpoint();
     // event_id is now actually event_global_spectrum_index
-    build_event_vector(events, range, event_index, event_time_zero,
-                                            event_id, event_time_offset);
-    timer.checkpoint();
-    split_for_ranks(events_for_ranks , nrank, events);
+    build_event_vector_and_split_for_ranks(events_for_ranks, nrank, range,
+                                           event_index, event_time_zero,
+                                           event_id, event_time_offset);
+    //build_event_vector(events, range, event_index, event_time_zero,
+    //                                        event_id, event_time_offset);
+    //timer.checkpoint();
+    //split_for_ranks(events_for_ranks , nrank, events);
     timer.checkpoint();
     redistribute_data(events_for_this_rank, events_for_ranks);
     timer.checkpoint();
