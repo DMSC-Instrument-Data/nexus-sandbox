@@ -7,11 +7,12 @@ import numpy
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("-f", "--filename", type=str, default='', help='File to grow. Modified in place.')
 parser.add_argument("-s", "--scale", type=int, default=2, help='Scale factor to multiply the number of events.')
+parser.add_argument("-r", "--root", type=str, default='entry', help='Name of the root entry containing the NXevent_data entries.')
 args = parser.parse_args()
 
 def grow(filename):
     with h5py.File(filename, 'a') as f:
-        for bank, event_data in f['entry'].items():
+        for bank, event_data in f[args.root].items():
             if not bank.endswith('_events'):
                 continue
             print("Found bank {}".format(bank))
