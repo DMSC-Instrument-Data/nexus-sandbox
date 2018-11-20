@@ -12,20 +12,22 @@ args = parser.parse_args()
 
 input_config = dict(root='entry-01', event_data=['Delayline_events'], Nx=16, Ny=32)
 # Used PG3_4866_event.nxs for testing
-output_config = dict(root='entry', event_data=['bank102_events'])
+output_config = dict(root='entry', event_data=['bank102_events'], event_id_offset=[128000])
 
 def position_to_index(pos, count):
     uint_max = 2**16-1
     # What if count (Nx or Ny) does not divide uint_max?
     return np.floor_divide(pos, (uint_max//count))
 
-def convert_id(event_id):
+def convert_id(event_id, id_offset):
     x = (event_id[:] >> 16) & 0xffff
     y = event_id[:] & 0xffff
     Nx = input_config['Nx']
     Ny = input_config['Ny']
     # Mantid requires 32 bit unsigned, so this should be correct dtype already.
-    return position_to_index(x, Nx) + Nx * position_to_index(y, Ny)
+    # Need offset here unless the banks event ids start at zero (Mantid
+    # will simply discard events that do not correspond to IDF).
+    return id_offset + position_to_index(x, Nx) + Nx * position_to_index(y, Ny)
 
 def make_index(absolute_times, time_zero):
     # Mantid uses 64 bit unsigned int for event_index
@@ -59,7 +61,13 @@ if __name__ == '__main__':
     copyfile(args.reference_filename, args.output_filename)
 
     with h5py.File(args.input_filename, 'r') as input_file, h5py.File(args.output_filename, 'a') as output_file:
-        for src,dst in zip(input_config['event_data'], output_config['event_data']):
+        # Delete unused banks from reference file
+        # Note: This does not actually make the file smaller.
+        for bank, event_data in output_file[output_config['root']].items():
+            if bank.endswith('_events') and not bank in output_config['event_data']:
+                del output_file[output_config['root']][bank]
+
+        for src, dst, id_offset in zip(input_config['event_data'], output_config['event_data'], output_config['event_id_offset']):
             src_data = input_file[input_config['root']][src]
             dst_data = output_file[output_config['root']][dst]
             print('Loading event data from group {}, writing into {}'.format(src, dst))
@@ -68,15 +76,24 @@ if __name__ == '__main__':
             # event_index = data['event_index']
 
             # event_id is 16 bit x pos and 16 bit y pos -> convert
-            event_id = convert_id(src_data['event_id'])
-            print(event_id[0:100])
+            event_id = convert_id(src_data['event_id'], id_offset)
 
             # event_time_offset is zero or amplitude of pulse, not needed.
             # event_time_offset = data['event_time_offset']
 
             # event_time_zero is the absolute time stamp of each event.
-            event_time_zero = src_data['event_time_zero']
-            time_zero_offset, time_zero, time_offset, index = convert_time(event_time_zero)
-            print(time_zero_offset, time_zero, time_offset, index)
+            absolute_times = src_data['event_time_zero']
+            time_zero_offset, time_zero, time_offset, index = convert_time(absolute_times)
 
+            dst_data['event_id'].resize(len(event_id), axis = 0)
+            dst_data['event_id'][:] = event_id
 
+            dst_data['event_time_zero'].resize(len(time_zero), axis = 0)
+            dst_data['event_time_zero'][:] = time_zero
+            dst_data['event_time_zero'].attrs['offset'] = time_zero_offset
+
+            dst_data['event_time_offset'].resize(len(time_offset), axis = 0)
+            dst_data['event_time_offset'][:] = time_offset
+
+            dst_data['event_index'].resize(len(index), axis = 0)
+            dst_data['event_index'][:] = index
