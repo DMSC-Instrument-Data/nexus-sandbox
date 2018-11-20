@@ -10,7 +10,7 @@ parser.add_argument("-r", "--reference-filename", type=str, help='Input file use
 parser.add_argument("-o", "--output-filename", type=str, help='Output filename.')
 args = parser.parse_args()
 
-input_config = dict(root='entry-01', event_data=['Delayline_events'], Nx=16, Ny=32)
+input_config = dict(root='entry-01', event_data=['Delayline_events'], Nx=150, Ny=150)
 # Used PG3_4866_event.nxs for testing
 output_config = dict(root='entry', event_data=['bank102_events'], event_id_offset=[128000])
 
