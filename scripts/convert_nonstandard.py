@@ -29,18 +29,20 @@ def convert_id(event_id, id_offset):
     # will simply discard events that do not correspond to IDF).
     return id_offset + position_to_index(x, Nx) + Nx * position_to_index(y, Ny)
 
-def make_index(absolute_times, time_zero):
+def make_index_and_offset(absolute_times, time_zero):
     # Mantid uses 64 bit unsigned int for event_index
     index = np.zeros(shape=time_zero.shape, dtype=np.uint64)
-    cur = 1
+    time_offset = absolute_times.copy()
+    cur = 0
     for i, t in enumerate(absolute_times):
         # Assuming that absolute_times and time_zero has the same offset.
-        if t >= time_zero[cur]:
+        while cur < len(index)-1 and t >= time_zero[cur+1]:
             index[cur] = i
             cur += 1
-            if cur == len(index):
-                break
-    return index
+        time_offset[i] -= time_zero[cur]
+    # Mantid uses 32 bit event_time_offset with unit microsecond.
+    time_offset = (time_offset*1e6).astype(dtype=np.float32)
+    return index, time_offset
 
 def to_seconds(nanoseconds):
     return (nanoseconds[:]/1e9).astype(dtype=np.float64)
@@ -51,10 +53,8 @@ def convert_time(absolute_times):
     time_zero_offset = datetime(year=2018, month=1, day=1).isoformat()
     # TODO Currently I do not know where to get this from (parse TDC?), creating dummy data for testing.
     # Mantid uses 64 bit event_time_zero with unit second.
-    time_zero = np.arange(0.0, 100.0, 0.071, dtype=np.float64)
-    # Mantid uses 32 bit event_time_offset with unit microsecond.
-    time_offset = np.random.uniform(0.0, 71000.0, size=absolute_times.shape).astype(dtype=np.float32)
-    index = make_index(absolute_times, time_zero)
+    time_zero = np.arange(0.0, 86400.0, 0.071, dtype=np.float64)
+    index, time_offset = make_index_and_offset(absolute_times, time_zero)
     return time_zero_offset, time_zero, time_offset, index
 
 if __name__ == '__main__':
