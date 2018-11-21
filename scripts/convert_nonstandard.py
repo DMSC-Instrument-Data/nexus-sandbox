@@ -10,8 +10,11 @@ parser.add_argument("-r", "--reference-filename", type=str, help='Input file use
 parser.add_argument("-o", "--output-filename", type=str, help='Output filename.')
 args = parser.parse_args()
 
+# event_data is a list of bank names to convert.
 input_config = dict(root='entry-01', event_data=['Delayline_events'], Nx=150, Ny=150)
 # Used PG3_4866_event.nxs for testing
+# event_data is a list of output bank names (must exist in reference file), length must match that in input_config.
+# event_id_offset must have same length as event_data. This is the offset of the detector ID or spectrum number for the given bank.
 output_config = dict(root='entry', event_data=['bank102_events'], event_id_offset=[128000])
 
 def position_to_index(pos, count):
@@ -20,6 +23,7 @@ def position_to_index(pos, count):
     return np.floor_divide(pos, (uint_max//count))
 
 def convert_id(event_id, id_offset):
+    # TODO Is the order correct? Is x in the high bits or the low bits?
     x = (event_id[:] >> 16) & 0xffff
     y = event_id[:] & 0xffff
     Nx = input_config['Nx']
@@ -49,7 +53,7 @@ def to_seconds(nanoseconds):
 
 def convert_time(absolute_times):
     absolute_times = to_seconds(absolute_times)
-    # Offset stored as attribute of event_time_zero. What is the base in our files?
+    # TODO Offset stored as attribute of event_time_zero. What is the base in our files?
     time_zero_offset = datetime(year=2018, month=1, day=1).isoformat()
     # TODO Currently I do not know where to get this from (parse TDC?), creating dummy data for testing.
     # Mantid uses 64 bit event_time_zero with unit second.
