@@ -7,11 +7,19 @@ from datetime import datetime
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("-i", "--input-filename", type=str, help='Input file to convert.')
 parser.add_argument("-r", "--reference-filename", type=str, help='Input file used as a reference for the file structure.')
+parser.add_argument("-m", "--metadata-filename", type=str, help='Input file used as source for chopper TDC information.')
 parser.add_argument("-o", "--output-filename", type=str, help='Output filename.')
 args = parser.parse_args()
 
 # event_data is a list of bank names to convert.
-input_config = dict(root='entry-01', event_data=['Delayline_events'], Nx=150, Ny=150)
+# For adc_test6.nxs (from Jonas)
+# input_config = dict(root='entry-01', event_data=['Delayline_events'], Nx=150, Ny=150)
+# For V20_example_1.nxs (from Matt)
+input_config = dict(root='entry/instrument', event_data=['detector_1/raw_event_data'], Nx=150, Ny=150)
+
+# HDF5 group names giving a path to the TDC used as pulse times.
+metadata_config = dict(NXdisk_chopper='entry/instrument/chopper_1')
+
 # Used PG3_4866_event.nxs for testing
 # event_data is a list of output bank names (must exist in reference file), length must match that in input_config.
 # event_id_offset must have same length as event_data. This is the offset of the detector ID or spectrum number for the given bank.
@@ -54,10 +62,17 @@ def to_seconds(nanoseconds):
 def convert_time(absolute_times):
     absolute_times = to_seconds(absolute_times)
     # TODO Offset stored as attribute of event_time_zero. What is the base in our files?
-    time_zero_offset = datetime(year=2018, month=1, day=1).isoformat()
+    time_zero_offset = datetime(year=1970, month=1, day=1).isoformat()
     # TODO Currently I do not know where to get this from (parse TDC?), creating dummy data for testing.
     # Mantid uses 64 bit event_time_zero with unit second.
-    time_zero = np.arange(0.0, 86400.0, 0.071, dtype=np.float64)
+    try:
+        with h5py.File(args.metadata_filename, 'r') as metadata_file:
+            time_zero = metadata_file[metadata_config['NXdisk_chopper']]['top_dead_centre/time']
+            time_zero = to_seconds(time_zero)
+    except Exception as e:
+        print(e)
+        print("Falling back to fake pulse times")
+        time_zero = np.arange(0.0, 86400.0, 0.071, dtype=np.float64)
     index, time_offset = make_index_and_offset(absolute_times, time_zero)
     return time_zero_offset, time_zero, time_offset, index
 
