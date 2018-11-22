@@ -6,10 +6,13 @@ from datetime import datetime
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("-i", "--input-filename", type=str, help='Input file to convert.')
-parser.add_argument("-r", "--reference-filename", type=str, help='Input file used as a reference for the file structure.')
 parser.add_argument("-m", "--metadata-filename", type=str, help='Input file used as source for chopper TDC information.')
+parser.add_argument("-r", "--reference-filename", type=str, help='Input file used as a reference for the file structure.')
 parser.add_argument("-o", "--output-filename", type=str, help='Output filename.')
 args = parser.parse_args()
+
+# Example usage:
+# python3 convert_nonstandard.py -i V20_example_1.nxs -m V20_example_1.nxs -r PG3_4866_event.nxs -o test.nxs
 
 # event_data is a list of bank names to convert.
 # For adc_test6.nxs (from Jonas)
@@ -72,6 +75,7 @@ def convert_time(absolute_times):
         time_zero_offset = time_zero[0]
         time_zero -= time_zero_offset
         time_zero = to_seconds(time_zero)
+        # TODO In our current test files the absolute times appear to have a different offset.
         absolute_times -= time_zero_offset
         absolute_times = to_seconds(absolute_times)
         time_zero_offset = to_iso8601(time_zero_offset)
