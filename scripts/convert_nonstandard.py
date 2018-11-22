@@ -59,22 +59,25 @@ def make_index_and_offset(absolute_times, time_zero):
 def to_seconds(nanoseconds):
     return (nanoseconds[:]/1e9).astype(dtype=np.float64)
 
+def to_iso8601(nanoseconds):
+    dt = datetime.fromtimestamp(nanoseconds // 1000000000)
+    s = dt.isoformat() + '.' + str(int(nanoseconds % 1000000000)).zfill(9)
+    return s
+
 def convert_time(absolute_times):
-    absolute_times = to_seconds(absolute_times)
-    # TODO Offset stored as attribute of event_time_zero. What is the base in our files?
-    time_zero_offset = datetime(year=1970, month=1, day=1).isoformat()
-    # TODO Currently I do not know where to get this from (parse TDC?), creating dummy data for testing.
     # Mantid uses 64 bit event_time_zero with unit second.
-    try:
-        with h5py.File(args.metadata_filename, 'r') as metadata_file:
-            time_zero = metadata_file[metadata_config['NXdisk_chopper']]['top_dead_centre/time']
-            time_zero = to_seconds(time_zero)
-    except Exception as e:
-        print(e)
-        print("Falling back to fake pulse times")
-        time_zero = np.arange(0.0, 86400.0, 0.071, dtype=np.float64)
-    index, time_offset = make_index_and_offset(absolute_times, time_zero)
-    return time_zero_offset, time_zero, time_offset, index
+    with h5py.File(args.metadata_filename, 'r') as metadata_file:
+        time_zero = metadata_file[metadata_config['NXdisk_chopper']]['top_dead_centre/time']
+        # Offset to be stored as attribute of event_time_zero.
+        time_zero_offset = time_zero[0]
+        time_zero -= time_zero_offset
+        time_zero = to_seconds(time_zero)
+        absolute_times -= time_zero_offset
+        absolute_times = to_seconds(absolute_times)
+        time_zero_offset = to_iso8601(time_zero_offset)
+        print(time_zero_offset)
+        index, time_offset = make_index_and_offset(absolute_times, time_zero)
+        return time_zero_offset, time_zero, time_offset, index
 
 if __name__ == '__main__':
     copyfile(args.reference_filename, args.output_filename)
