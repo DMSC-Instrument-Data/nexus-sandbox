@@ -67,6 +67,10 @@ def to_iso8601(nanoseconds):
     s = dt.isoformat() + '.' + str(int(nanoseconds % 1000000000)).zfill(9)
     return s
 
+def unix_epoch_to_epics_epoch_offset():
+    # TODO: Note that this ignores leap seconds, which is probably an issue.
+    return int((datetime(year=1990, month=1, day=1) - datetime(year=1970, month=1, day=1)).total_seconds())
+
 def convert_time(absolute_times):
     # Mantid uses 64 bit event_time_zero with unit second.
     with h5py.File(args.metadata_filename, 'r') as metadata_file:
@@ -76,10 +80,10 @@ def convert_time(absolute_times):
         time_zero -= time_zero_offset
         time_zero = to_seconds(time_zero)
         # TODO In our current test files the absolute times appear to have a different offset.
+        absolute_times = absolute_times[:] + unix_epoch_to_epics_epoch_offset()
         absolute_times -= time_zero_offset
         absolute_times = to_seconds(absolute_times)
         time_zero_offset = to_iso8601(time_zero_offset)
-        print(time_zero_offset)
         index, time_offset = make_index_and_offset(absolute_times, time_zero)
         return time_zero_offset, time_zero, time_offset, index
 
