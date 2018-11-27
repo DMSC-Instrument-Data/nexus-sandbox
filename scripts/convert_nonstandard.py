@@ -12,21 +12,23 @@ parser.add_argument("-o", "--output-filename", type=str, help='Output filename.'
 args = parser.parse_args()
 
 # Example usage:
-# python3 convert_nonstandard.py -i V20_example_1.nxs -m V20_example_1.nxs -r PG3_4866_event.nxs -o test.nxs
+# python3 convert_nonstandard.py -i V20_example_1.nxs -m V20_example_1.nxs -r LOKI_definition.hdf5 -o test.nxs
 
 # event_data is a list of bank names to convert.
 # For adc_test6.nxs (from Jonas)
 # input_config = dict(root='entry-01', event_data=['Delayline_events'], Nx=150, Ny=150)
 # For V20_example_1.nxs (from Matt)
-input_config = dict(root='entry/instrument', event_data=['detector_1/raw_event_data'], Nx=150, Ny=150)
+input_config = dict(root='entry/instrument', event_data=['detector_1/raw_event_data', 'detector_1/raw_event_data'], Nx=150, Ny=150)
 
 # HDF5 group names giving a path to the TDC used as pulse times.
 metadata_config = dict(NXdisk_chopper='entry/instrument/chopper_1')
 
-# Used PG3_4866_event.nxs for testing
-# event_data is a list of output bank names (must exist in reference file), length must match that in input_config.
+# Used LOKI_definition.hdf5 testing
+# NXdetector is a list of output bank names (must exist in reference file), length must match that in input_config.
 # event_id_offset must have same length as event_data. This is the offset of the detector ID or spectrum number for the given bank.
-output_config = dict(root='entry', event_data=['bank102_events'], event_id_offset=[128000])
+#output_config = dict(root='entry', event_data=['bank102_events'], event_id_offset=[128000])
+# event_id_offset is bank*1000 for LOKI
+output_config = dict(root='raw_data_1', NXinstrument='instrument', NXdetector=['detector_1', 'detector_2'], event_id_offset=[0, 1000])
 
 def position_to_index(pos, count):
     uint_max = 2**16-1
@@ -80,6 +82,7 @@ def convert_time(absolute_times):
         time_zero -= time_zero_offset
         time_zero = to_seconds(time_zero)
         # TODO In our current test files the absolute times appear to have a different offset.
+        # TODO It *might* be since beginning of the day?
         absolute_times = absolute_times[:] + unix_epoch_to_epics_epoch_offset()
         absolute_times -= time_zero_offset
         absolute_times = to_seconds(absolute_times)
@@ -87,19 +90,35 @@ def convert_time(absolute_times):
         index, time_offset = make_index_and_offset(absolute_times, time_zero)
         return time_zero_offset, time_zero, time_offset, index
 
+NXevent_data_names = ['event_id', 'event_index', 'event_time_offset', 'event_time_zero']
+NXevent_data_dtypes = ['i4', 'i8', 'f4', 'f8']
+
+def make_bank(parent, chunk=None, compression=None):
+    event_data = parent.create_group("event_data")
+    event_data.attrs['NXclass'] = 'NXevent_data'
+    for name, dtype in zip(NXevent_data_names, NXevent_data_dtypes):
+        event_data.create_dataset(name, (0,), dtype=dtype, chunks=chunk, compression=compression, maxshape=(None,))
+    event_data['event_time_offset'].attrs['units'] = 'microsecond'
+    event_data['event_time_zero'].attrs['units'] = 'second'
+
+    return event_data
+
+def link_bank_into_root(root, target, nx_detector_name):
+    root["{}_event_data".format(nx_detector_name)] = target
+
 if __name__ == '__main__':
     copyfile(args.reference_filename, args.output_filename)
 
     with h5py.File(args.input_filename, 'r') as input_file, h5py.File(args.output_filename, 'a') as output_file:
-        # Delete unused banks from reference file
-        # Note: This does not actually make the file smaller.
-        for bank, event_data in output_file[output_config['root']].items():
-            if bank.endswith('_events') and not bank in output_config['event_data']:
-                del output_file[output_config['root']][bank]
-
-        for src, dst, id_offset in zip(input_config['event_data'], output_config['event_data'], output_config['event_id_offset']):
+        for src, dst, id_offset in zip(input_config['event_data'], output_config['NXdetector'], output_config['event_id_offset']):
             src_data = input_file[input_config['root']][src]
-            dst_data = output_file[output_config['root']][dst]
+            dst_root = output_file[output_config['root']]
+            dst_NXdetector = dst_root[output_config['NXinstrument']][dst]
+
+            make_bank(dst_NXdetector)
+            dst_data = dst_NXdetector['event_data']
+            link_bank_into_root(dst_root, dst_data, dst)
+
             print('Loading event data from group {}, writing into {}'.format(src, dst))
 
             # event_index is just a monotonically increasing integer, not needed.
