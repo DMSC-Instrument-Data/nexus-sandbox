@@ -96,7 +96,7 @@ NXevent_data_dtypes = ['i4', 'i8', 'f4', 'f8']
 
 def make_bank(parent, chunk=None, compression=None):
     event_data = parent.create_group("event_data")
-    event_data.attrs['NXclass'] = 'NXevent_data'
+    event_data.attrs.create('NX_class', 'NXevent_data', None, dtype='<S12')
     for name, dtype in zip(NXevent_data_names, NXevent_data_dtypes):
         event_data.create_dataset(name, (0,), dtype=dtype, chunks=chunk, compression=compression, maxshape=(None,))
     event_data['event_time_offset'].attrs['units'] = 'microsecond'
