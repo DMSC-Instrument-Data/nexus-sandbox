@@ -79,6 +79,7 @@ def convert_time(absolute_times):
         time_zero = metadata_file[metadata_config['NXdisk_chopper']]['top_dead_centre/time']
         # Offset to be stored as attribute of event_time_zero.
         time_zero_offset = time_zero[0]
+        end_time = to_iso8601(time_zero[-1])
         time_zero -= time_zero_offset
         time_zero = to_seconds(time_zero)
         # TODO In our current test files the absolute times appear to have a different offset.
@@ -88,7 +89,7 @@ def convert_time(absolute_times):
         absolute_times = to_seconds(absolute_times)
         time_zero_offset = to_iso8601(time_zero_offset)
         index, time_offset = make_index_and_offset(absolute_times, time_zero)
-        return time_zero_offset, time_zero, time_offset, index
+        return time_zero_offset, end_time, time_zero, time_offset, index
 
 NXevent_data_names = ['event_id', 'event_index', 'event_time_offset', 'event_time_zero']
 NXevent_data_dtypes = ['i4', 'i8', 'f4', 'f8']
@@ -110,6 +111,8 @@ if __name__ == '__main__':
     copyfile(args.reference_filename, args.output_filename)
 
     with h5py.File(args.input_filename, 'r') as input_file, h5py.File(args.output_filename, 'a') as output_file:
+        first_bank = True
+
         for src, dst, id_offset in zip(input_config['event_data'], output_config['NXdetector'], output_config['event_id_offset']):
             src_data = input_file[input_config['root']][src]
             dst_root = output_file[output_config['root']]
@@ -132,7 +135,7 @@ if __name__ == '__main__':
 
             # event_time_zero is the absolute time stamp of each event.
             absolute_times = src_data['event_time_zero']
-            time_zero_offset, time_zero, time_offset, index = convert_time(absolute_times)
+            time_zero_offset, end_time, time_zero, time_offset, index = convert_time(absolute_times)
 
             dst_data['event_id'].resize(len(event_id), axis = 0)
             dst_data['event_id'][:] = event_id
@@ -146,3 +149,11 @@ if __name__ == '__main__':
 
             dst_data['event_index'].resize(len(index), axis = 0)
             dst_data['event_index'][:] = index
+
+            if first_bank:
+                dt = h5py.special_dtype(vlen=str)
+                dst_root.create_dataset('start_time', (1,), dtype=dt, maxshape=(None,))
+                dst_root['start_time'][0] = time_zero_offset
+                dst_root.create_dataset('end_time', (1,), dtype=dt, maxshape=(None,))
+                dst_root['end_time'][0] = end_time
+                first_bank = False
