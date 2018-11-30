@@ -71,28 +71,40 @@ def to_iso8601(nanoseconds):
 
 def unix_epoch_to_epics_epoch_offset():
     # TODO: Note that this ignores leap seconds, which is probably an issue.
-    return int((datetime(year=1990, month=1, day=1) - datetime(year=1970, month=1, day=1)).total_seconds())
+    # return int((datetime(year=1990, month=1, day=1) - datetime(year=1970, month=1, day=1)).total_seconds())
+    return int((datetime(year=2018, month=11, day=12) - datetime(year=1970, month=1, day=1)).total_seconds()*1.0e9)
+
 
 def convert_time(absolute_times):
     # Mantid uses 64 bit event_time_zero with unit second.
     with h5py.File(args.metadata_filename, 'r') as metadata_file:
-        time_zero = metadata_file[metadata_config['NXdisk_chopper']]['top_dead_centre/time']
-        # Offset to be stored as attribute of event_time_zero.
+        time_zero = metadata_file[metadata_config['NXdisk_chopper']]['top_dead_centre/time'] # this is nanoseconds
         time_zero_offset = time_zero[0]
+        time_zero = np.arange(0.0,1.8e12,7.1e7)
+        time_zero += time_zero_offset
+        # Offset to be stored as attribute of event_time_zero.
+        # time_zero_offset = time_zero[0]
         end_time = to_iso8601(time_zero[-1])
         time_zero -= time_zero_offset
         time_zero = to_seconds(time_zero)
         # TODO In our current test files the absolute times appear to have a different offset.
         # TODO It *might* be since beginning of the day?
-        absolute_times = absolute_times[:] + unix_epoch_to_epics_epoch_offset()
-        absolute_times -= time_zero_offset
+        #   --> in the V20_example_1.nxs file, they are nanoseconds since the detector was switched on
+        # the chopper top dead centre points to November 12 2018 07:37:11, so the detector was probably
+        # switched on Nov 12, but we do not know at what time
+        # absolute_times = absolute_times[:] + unix_epoch_to_epics_epoch_offset()
+        # absolute_times -= time_zero_offset
+        absolute_times = absolute_times[:] - absolute_times[0]
+
         absolute_times = to_seconds(absolute_times)
         time_zero_offset = to_iso8601(time_zero_offset)
         index, time_offset = make_index_and_offset(absolute_times, time_zero)
         return time_zero_offset, end_time, time_zero, time_offset, index
 
 NXevent_data_names = ['event_id', 'event_index', 'event_time_offset', 'event_time_zero']
-NXevent_data_dtypes = ['i4', 'i8', 'f4', 'f8']
+#NXevent_data_dtypes = ['i4', 'i8', 'f4', 'f8']
+NXevent_data_dtypes = ['uint32', 'uint64', 'float32', 'float64']
+
 
 def make_bank(parent, chunk=None, compression=None):
     event_data = parent.create_group("event_data")
@@ -156,4 +168,7 @@ if __name__ == '__main__':
                 dst_root['start_time'][0] = time_zero_offset
                 dst_root.create_dataset('end_time', (1,), dtype=dt, maxshape=(None,))
                 dst_root['end_time'][0] = end_time
+                dst_root.create_dataset('duration', (1,), dtype='<S6', maxshape=(None,))
+                dst_root['duration'].attrs['units'] = 'second'
                 first_bank = False
+
